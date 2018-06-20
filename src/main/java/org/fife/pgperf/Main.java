@@ -4,72 +4,25 @@ import java.sql.*;
 
 public class Main {
 
-    public static void printDataTypes(Connection conn, String tableName) throws SQLException {
+    private static final String TABLE_NAME = "test_table";
 
-        try (Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery("select * from \"" + tableName + "\" limit 1")) {
-
-            ResultSetMetaData rsmd = rs.getMetaData();
-
-            System.out.printf("Table \"%s\" has %d columns:\n", tableName, rsmd.getColumnCount());
-
-            for (int i = 0; i < rsmd.getColumnCount(); i++) {
-
-                String type = rsmd.getColumnTypeName(i + 1);
-                if ("varchar".equalsIgnoreCase(type)) {
-                    type += "(" + rsmd.getColumnDisplaySize(i + 1) + ")";
-                }
-                if (ResultSetMetaData.columnNoNulls == rsmd.isNullable(i + 1)) {
-                    type += " not null";
-                }
-
-                System.out.printf("%d. %s %s\n", i + 1, rsmd.getColumnName(i + 1), type);
-            }
-        }
-    }
-
-    public static void createAllDataTypesTable(Connection conn, String tableName) throws SQLException {
-
-        try (Statement stmt = conn.createStatement()) {
-
-            stmt.execute("drop table if exists \"" + tableName + "\"");
-
-            String sql = "create table \"" + tableName + "\" (\n" +
-                    "   bigint_col bigint,\n" +
-                    "   bool_col bool,\n" +
-                    "   float_col float,\n" +
-                    "   date_col date,\n" +
-                    "   double_precision_col double precision,\n" +
-                    "   int_col integer,\n" +
-                    "   serial_col serial,\n" +
-                    "   text_col text,\n" +
-                    "   timestamp_col timestamp,\n" +
-                    "   timestamp_with_timezone_col timestamp with time zone,\n" +
-                    "   timestamp_without_timezone_col timestamp without time zone,\n" +
-                    "   varchar_unbounded_col varchar,\n" +
-                    "   varchar_40_col varchar(40) unique not null\n" +
-                    ");";
-
-            System.out.println("Creating table with schema:\n" + sql);
-
-            stmt.execute(sql);
-        }
-    }
-
-    public static Connection createConnection() throws SQLException {
-
-        String url = "jdbc:postgresql://localhost:5432/postgres";
-        String user = "postgres";
-        String password = "postgres";
-
-        return DriverManager.getConnection(url, user, password);
-    }
+    private static final int MAIN_TABLE_ROW_COUNT = 1_000_000;
+    private static final int NEW_DATA_ROW_COUNT = 100_000;
 
     public static void main(String[] args) throws SQLException {
 
-        try (Connection conn = createConnection()) {
-            createAllDataTypesTable(conn, "test_table");
-            printDataTypes(conn, "test_table");
-        }
+        PgUtil pgUtil = new PgUtil();
+
+        Timer.start();
+        pgUtil.createAllDataTypesTable(TABLE_NAME, MAIN_TABLE_ROW_COUNT, 0);
+        Timer.stopAndLog(String.format("Creating table %s with %d rows", TABLE_NAME, MAIN_TABLE_ROW_COUNT));
+
+        Timer.start();
+        pgUtil.createTempTableClone(TABLE_NAME, "temp_table", NEW_DATA_ROW_COUNT, 2*MAIN_TABLE_ROW_COUNT);
+        Timer.stopAndLog(String.format("Creating temp table with same schema as %s, with %d rows", TABLE_NAME, NEW_DATA_ROW_COUNT));
+
+        Timer.start();
+        pgUtil.performUpsert(TABLE_NAME, "temp_table");
+        Timer.stopAndLog(String.format("Merging %s into %s via left outer join", "temp_table", TABLE_NAME));
     }
 }

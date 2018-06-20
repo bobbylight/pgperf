@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+}
+
+group 'org.fife'
+version '1.0.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+wrapper {
+    gradleVersion '4.8'
+}
+
+dependencies {
+
+    compile 'org.postgresql:postgresql:42.2.2'
+
+    testCompile 'junit:junit:4.12'
+}
